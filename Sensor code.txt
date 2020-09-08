@@ -1,0 +1,98 @@
+#include <ESP8266WiFi.h>
+#define WIFI_SSID "STS"
+#define WIFI_PASS "password"
+#define HOST_IFTTT "maker.ifttt.com"
+#define IFTTT_KEY "lZt99cnqXPoho89Wgtmcuh4wHoRXkDYxc6LPuMb_9IK"
+const int irSensor = 5;
+const int irSensor2 = 0;
+const int LED = 4;
+long previousMillis = 0;
+bool seatFull = false;
+void wifiSetup() {
+  // Set WIFI module to STA mode
+  WiFi.mode(WIFI_STA);
+  // Connect
+  Serial.printf("[WIFI] Connecting to %s ", WIFI_SSID);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  // Wait
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(100);
+  }
+  Serial.println();
+  // Connected!
+  Serial.printf("Connected to Wi-Fi %s, IP address: %s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
+}
+void setup() {  pinMode(irSensor, INPUT);
+  pinMode(irSensor2, INPUT);
+  pinMode(LED, OUTPUT);
+  Serial.begin(115200);
+  wifiSetup();
+}
+
+bool timeOut() {
+  long currentMillis = millis();
+  if (currentMillis - previousMillis > 20
+  000) {
+    previousMillis = currentMillis;
+    return true;
+  }
+  return false;
+}
+void loop() {
+  // put your main code here, to run repeatedly:
+  if (timeOut() == true && seatFull == false) {
+    Serial.println("Time out");
+    delay(1000);
+    WiFiClient wifiClient;
+    const int httpPort = 80;
+    if (!wifiClient.connect(HOST_IFTTT, httpPort)) {
+      Serial.println("Connection failed");
+    }
+    else {
+      Serial.println("Time's up...");
+      String url = "GET /trigger/Time_Out/with/key/";
+      url += IFTTT_KEY;
+      url += " HTTP/1.1\r\nHost: ";
+      url += HOST_IFTTT;
+      url += "\r\nConnection: close\r\n\r\n";
+      wifiClient.print(url);
+    }
+    delay(5000);
+
+  } else {
+    Serial.println("Waiting for passengers");
+    delay(1000);
+    int statusSensor = digitalRead (irSensor);
+    int statusSensor2 = digitalRead (irSensor2);
+    //    Serial.print("Sensor 1:");
+    //    Serial.println(statusSensor);
+    //    Serial.print("Sensor 2:");
+    //    Serial.println(statusSensor2);
+    //    delay(500);
+    if (statusSensor == 0 && statusSensor2 == 0) {
+      seatFull = true;
+      digitalWrite(LED, HIGH);
+      WiFiClient wifiClient;
+      const int httpPort = 80;
+      if (!wifiClient.connect(HOST_IFTTT, httpPort)) {
+        Serial.println("Connection failed");
+      }
+      else {
+        Serial.println("Bus full...");
+        String url = "GET /trigger/Seat_Full/with/key/";
+        url += IFTTT_KEY;
+        url += " HTTP/1.1\r\nHost: ";
+        url += HOST_IFTTT;
+        url += "\r\nConnection: close\r\n\r\n";
+        wifiClient.print(url);
+      }
+      delay(1000);
+    }
+    else
+    {
+      seatFull = false;
+      digitalWrite(LED, LOW);
+    }
+  }
+}
